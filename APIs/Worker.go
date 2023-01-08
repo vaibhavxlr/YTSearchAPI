@@ -2,6 +2,7 @@ package APIs
 
 import (
 	DTOs "YTSearchAPI/DTOs"
+	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -9,21 +10,32 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/lib/pq"
 	"google.golang.org/api/googleapi/transport"
 	"google.golang.org/api/youtube/v3"
 )
 
+// flags
 var (
 	query      = flag.String("query", "Cricket", "Search term")
 	maxResults = flag.Int64("max-results", 25, "Max YouTube results")
-	apiKey     = flag.String("apiKey", "AIzaSyBpelB1M4i4IKCn_-H4makZ4JU8POMkZg8", "YT credential API Key")
+	apiKey     = flag.String("apiKey", "AIzaSyBEHkskW5N6D1aT3v52CvLIAW2DL0sAO7Y", "YT credential API Key")
 )
 
-// const apiKey = "AIzaSyBEHkskW5N6D1aT3v52CvLIAW2DL0sAO7Y"
+// db details
+const (
+	host     = "localhost"
+	port     = 55000
+	user     = "postgres"
+	password = "postgrespw"
+	dbname   = "VideoData"
+)
 
 func FetchAndStoreVideos(wg *sync.WaitGroup) {
 
 	flag.Parse()
+	defer wg.Done()
+
 	client := &http.Client{
 		Transport: &transport.APIKey{Key: *apiKey},
 	}
@@ -53,7 +65,7 @@ func FetchAndStoreVideos(wg *sync.WaitGroup) {
 
 		if err != nil {
 			log.Fatalf("Error calling  YouTube: %v", err)
-			wg.Done()
+			break
 		}
 
 		// At max we are fetching 25 video items
@@ -67,16 +79,7 @@ func FetchAndStoreVideos(wg *sync.WaitGroup) {
 				video.Description = item.Snippet.Description
 				video.PublishDate = item.Snippet.PublishedAt
 				video.Title = item.Snippet.Title
-
-				thumbnails := make([]DTOs.Thumbnail, 0)
-				var thumbnail DTOs.Thumbnail
-				thumbnail.URL = item.Snippet.Thumbnails.Default.Url
-				thumbnails = append(thumbnails, thumbnail)
-				thumbnail.URL = item.Snippet.Thumbnails.Medium.Url
-				thumbnails = append(thumbnails, thumbnail)
-				thumbnail.URL = item.Snippet.Thumbnails.High.Url
-				thumbnails = append(thumbnails, thumbnail)
-				video.Thumbnails = thumbnails
+				video.Thumbnails = item.Snippet.Thumbnails.High.Url
 				videos = append(videos, video)
 			}
 		}
@@ -84,12 +87,14 @@ func FetchAndStoreVideos(wg *sync.WaitGroup) {
 		done, err := printNStoreInDB(videos)
 		if err != nil || !done {
 			log.Fatalf("Error : %v", err)
-			wg.Done()
+			break
 		}
 		if done {
 			fmt.Println("Succesfully pushed in DB")
 		}
-		time.Sleep(time.Second * 5)
+		// this helps in not exhausting the daily YT api quota,
+		// also buys some time to get fresh uploads
+		time.Sleep(time.Minute)
 	}
 
 }
@@ -97,8 +102,43 @@ func FetchAndStoreVideos(wg *sync.WaitGroup) {
 // Print and store in DB
 func printNStoreInDB(videos []DTOs.Video) (bool, error) {
 	for _, val := range videos {
-		fmt.Println(val.Title, "-", val.PublishDate)
+		fmt.Println(val.Thumbnails, "-", val.PublishDate)
 		fmt.Print("\n")
+	}
+
+	// DB related code
+
+	// defining connection string
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+
+	// we open and close connection for every tranche of videos
+	// opening a DB connection
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		fmt.Println("Failed to verify supplied argument")
+		return false, err
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		fmt.Println("Failed to establish a connection with DB")
+		return false, err
+	}
+
+	sqlStatement := `INSERT INTO ytvideos 
+	(vidId, title, description, publishDate, thumbnails)				
+	VALUES ($1, $2, $3, $4, $5)`
+
+	for _, val := range videos {
+
+		_, err := db.Exec(sqlStatement, val.VidId, val.Title, val.Description,
+			val.PublishDate, val.Thumbnails)
+		if err != nil {
+			fmt.Println("Failed to make an entry in DB", err)
+			// return false, err
+		}
 	}
 
 	return true, nil
