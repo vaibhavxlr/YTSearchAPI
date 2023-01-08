@@ -16,8 +16,10 @@ import (
 var (
 	query      = flag.String("query", "Cricket", "Search term")
 	maxResults = flag.Int64("max-results", 25, "Max YouTube results")
-	apiKey     = flag.String("apiKey", "AIzaSyBEHkskW5N6D1aT3v52CvLIAW2DL0sAO7Y", "YT credential API Key")
+	apiKey     = flag.String("apiKey", "AIzaSyBpelB1M4i4IKCn_-H4makZ4JU8POMkZg8", "YT credential API Key")
 )
+
+// const apiKey = "AIzaSyBEHkskW5N6D1aT3v52CvLIAW2DL0sAO7Y"
 
 func FetchAndStoreVideos(wg *sync.WaitGroup) {
 
@@ -27,6 +29,7 @@ func FetchAndStoreVideos(wg *sync.WaitGroup) {
 	}
 
 	service, err := youtube.New(client)
+	// fmt.Printf("%T | %v", err, err)
 	if err != nil {
 		log.Fatalf("Error creating new YouTube client: %v", err)
 		wg.Done()
@@ -34,14 +37,15 @@ func FetchAndStoreVideos(wg *sync.WaitGroup) {
 
 	// Make the API call to YouTube.
 	var part []string
-	// part = append(part, "id")
+	part = append(part, "id")
 	part = append(part, "snippet")
 
 	for {
 		call := service.Search.List(part).
 			Q(*query).
 			MaxResults(*maxResults).
-			PublishedAfter(time.Now().Format("2006-01-02T15:04:05Z07:00")).
+			PublishedAfter(time.Now().Add(-1 * time.Minute).Format("2006-01-02T15:04:05Z07:00")).
+			PublishedBefore(time.Now().Format("2006-01-02T15:04:05Z07:00")).
 			Type("video").
 			Order("date")
 
@@ -73,25 +77,29 @@ func FetchAndStoreVideos(wg *sync.WaitGroup) {
 				thumbnail.URL = item.Snippet.Thumbnails.High.Url
 				thumbnails = append(thumbnails, thumbnail)
 				video.Thumbnails = thumbnails
+				videos = append(videos, video)
 			}
 		}
 
 		done, err := printNStoreInDB(videos)
 		if err != nil || !done {
-			log.Fatalf("Error creating new YouTube client: %v", err)
+			log.Fatalf("Error : %v", err)
 			wg.Done()
 		}
 		if done {
 			fmt.Println("Succesfully pushed in DB")
 		}
-		time.Sleep(time.Minute)
+		time.Sleep(time.Second * 5)
 	}
 
 }
 
 // Print and store in DB
-func printNStoreInDB(videos []DTOs.Video) (bool, error){
+func printNStoreInDB(videos []DTOs.Video) (bool, error) {
+	for _, val := range videos {
+		fmt.Println(val.Title, "-", val.PublishDate)
+		fmt.Print("\n")
+	}
 
-	retun false, nil
+	return true, nil
 }
-

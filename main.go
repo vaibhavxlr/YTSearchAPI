@@ -10,6 +10,7 @@ func main() {
 	fmt.Println("starting server...")
 
 	fmt.Println("starting worker...")
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go APIs.FetchAndStoreVideos(&wg)
