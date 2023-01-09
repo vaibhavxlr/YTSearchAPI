@@ -24,7 +24,7 @@ var (
 
 // db details
 const (
-	host     = "localhost"
+	host     = "192.168.18.88"
 	port     = 55000
 	user     = "postgres"
 	password = "postgrespw"
