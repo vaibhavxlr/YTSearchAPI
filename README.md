@@ -12,13 +12,15 @@
             "title":"",
             "description":"",
             "exactMatch" : false
-        }'
+        }'  
+
     Note:- You can get exactMatch if you set the flag as true
 
 6) GET API:-
     curl --location --request GET 'localhost:7777/api/GetVideos?limit=2&start=0' \
     --header 'Content-Type: application/json' \
     '
+
     Note:- You can give start and limit as per the pagination requirements
 7) Additional features:-
     you can pass -query, -apiKey flags as per need
@@ -28,6 +30,7 @@
 
 
 -----------TO RUN WITH DOCKER[EXPERIMENTAL]------------
+
 Note:- I am new to docker, so this might or  might not work properly
 1) sudo docker build -t yt .
 
