@@ -9,5 +9,11 @@ type Video struct {
 }
 
 type ErrorResp struct {
-	ErrorMsg   string `json:"errMsg"`
+	ErrorMsg string `json:"errMsg"`
+}
+
+type SearchReqBody struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	ExactMatch  bool   `json:"exactMatch"`
 }

@@ -17,6 +17,13 @@ func SetContentTypeAsJson(next http.Handler) http.Handler {
 	})
 }
 
+func getError(err string) []byte {
+	var errorObj DTOs.ErrorResp
+	errorObj.ErrorMsg = err
+	errorObject, _ := json.Marshal(errorObj)
+	return errorObject
+}
+
 func GetVideos(w http.ResponseWriter, r *http.Request) {
 	start := r.URL.Query().Get("start")
 	limit := r.URL.Query().Get("limit")
@@ -35,29 +42,35 @@ func GetVideos(w http.ResponseWriter, r *http.Request) {
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
 
-	// we open and close connection for every tranche of videos
 	// opening a DB connection
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		fmt.Println("Failed to verify supplied argument")
+		msg := "Failed to verify supplied argument"
+		fmt.Println(msg)
+		w.WriteHeader(404)
+		w.Write(getError(msg))
+		return
 	}
 	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
-		fmt.Println("Failed to establish a connection with DB")
+		msg := "Failed to establish a connection with DB"
+		fmt.Println(msg)
+		w.WriteHeader(404)
+		w.Write(getError(msg))
+		return
 	}
 	sqlStatement := fmt.Sprintf("SELECT * FROM ytvideos ORDER BY publishdate DESC LIMIT %s OFFSET %s", limit, start)
 
 	rows, err := db.Query(sqlStatement)
-	
+
 	if err != nil || rows.Err() != nil {
-		fmt.Println("Failed to make an entry in DB", err)
-		var errorObj DTOs.ErrorResp
-		errorObj.ErrorMsg = err.Error()
-		w.WriteHeader(http.StatusNotFound)
-		erroObject, _ := json.Marshal(errorObj)
-		w.Write(erroObject)
+		msg := fmt.Sprint("Failed to fetch data from DB", err)
+		fmt.Println(msg)
+		w.WriteHeader(404)
+		w.Write(getError(msg))
+		return
 	}
 
 	results := make([]DTOs.Video, 0)
@@ -67,7 +80,11 @@ func GetVideos(w http.ResponseWriter, r *http.Request) {
 			&result.Description, &result.PublishDate,
 			&result.Thumbnails)
 		if err != nil {
-
+			msg := fmt.Sprint("Failed to map data from DB", err)
+			fmt.Println(msg)
+			w.WriteHeader(404)
+			w.Write(getError(msg))
+			return
 		}
 		results = append(results, result)
 	}
@@ -78,5 +95,78 @@ func GetVideos(w http.ResponseWriter, r *http.Request) {
 }
 
 func Search(w http.ResponseWriter, r *http.Request) {
+	var reqBody DTOs.SearchReqBody
+	err := json.NewDecoder(r.Body).Decode(&reqBody)
+	if err != nil {
+		msg := "Request is not sent in proper format"
+		fmt.Println(msg)
+		w.WriteHeader(404)
+		w.Write(getError(msg))
+		return
+	}
+
+	// defining connection string
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+
+	// opening a DB connection
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		msg := "Failed to verify supplied argument"
+		fmt.Println(msg)
+		w.WriteHeader(404)
+		w.Write(getError(msg))
+		return
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		msg := "Failed to establish a connection with DB"
+		fmt.Println(msg)
+		w.WriteHeader(404)
+		w.Write(getError(msg))
+		return
+	}
+	sqlStatement := fmt.Sprintf(`SELECT * FROM ytvideos WHERE title LIKE %s AND description LIKE %s`, "'%"+reqBody.Title+"%'", "'%"+reqBody.Description+"%'")
+	if reqBody.ExactMatch {
+		sqlStatement = fmt.Sprintf(`SELECT * FROM ytvideos WHERE title LIKE %s AND description LIKE %s`, "'"+reqBody.Title+"'", "'"+reqBody.Description+"'")
+	}
+
+	rows, err := db.Query(sqlStatement)
+
+	if err != nil || rows.Err() != nil {
+		msg := fmt.Sprint("Failed to fetch data from DB", err)
+		fmt.Println(msg)
+		w.WriteHeader(404)
+		w.Write(getError(msg))
+		return
+	}
+
+	results := make([]DTOs.Video, 0)
+	for rows.Next() {
+		var result DTOs.Video
+		err = rows.Scan(&result.VidId, &result.Title,
+			&result.Description, &result.PublishDate,
+			&result.Thumbnails)
+		if err != nil {
+			msg := fmt.Sprint("Failed to map data from DB", err)
+			fmt.Println(msg)
+			w.WriteHeader(404)
+			w.Write(getError(msg))
+			return
+		}
+		results = append(results, result)
+	}
+	if len(results) == 0 {
+		msg := "No matching response for the req criteria"
+		fmt.Println(msg)
+		w.WriteHeader(200)
+		w.Write(getError(msg))
+		return
+	}
+	val, _ := json.Marshal(results)
+	w.WriteHeader(http.StatusOK)
+	w.Write(val)
 
 }
