@@ -25,6 +25,7 @@
 7) Additional features:-
     you can pass -query, -apiKey flags as per need
 
+    Note:- The supplied API key has been revoked, please use another key.
 
     
 
