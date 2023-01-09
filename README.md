@@ -3,6 +3,13 @@
 1) Clone the repo
 2) Run "go mod download"
 3) Run an instance of postgres DB in Docker or local
+
+    CREATE DATABASE VideoData
+
+    Inside that:- 
+    CREATE TABLE ytvideos ( vidid varchar(100) PRIMARY KEY, title TEXT, description TEXT, publishdate varchar(100), thumbnails varchar(200) )
+
+
 4) Populate its credentials in APIs/Worker.go file, Line no.26
 5) Go to postman
 5) SEARCH API:- 
