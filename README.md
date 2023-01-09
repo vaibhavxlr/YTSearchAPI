@@ -38,6 +38,7 @@ Note:- I am new to docker, so this might or  might not work properly
 2) RUN postgres via docker compose
 
 3) CREATE DATABASE VideoData 
+
    Inside that:- 
    CREATE TABLE ytvideos (
         vidid varchar(100) PRIMARY KEY,
